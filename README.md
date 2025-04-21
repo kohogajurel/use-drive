@@ -24,42 +24,128 @@ pnpm add use-drive
 ## Usage
 
 ```typescript
-import UseDrive from 'use-drive';
+import {
+  initDrive,
+  getAuthUrl,
+  getTokens,
+  setCredentials,
+  listFiles,
+  uploadFile,
+  deleteFile,
+} from "use-drive";
 
-// initialize
-const drive = new UseDrive(
-  'YOUR_CLIENT_ID',
-  'YOUR_CLIENT_SECRET',
-  'YOUR_REDIRECT_URI'
-);
+const oauth2Client = initDrive({
+  clientId: "YOUR_CLIENT_ID",
+  clientSecret: "YOUR_CLIENT_SECRET",
+  redirectUri: "YOUR_REDIRECT_URI",
+});
 
-const authUrl = drive.getAuthUrl();
-console.log('Authorize this app by visiting:', authUrl);
+async function authenticate() {
+  const authUrl = getAuthUrl();
+  console.log("Please authorize this app by visiting:", authUrl);
 
-async function handleAuthCode(code) {
-  const tokens = await drive.getTokens(code);
-  
-  // list files
-  const files = await drive.listFiles();
-  console.log('Your files:', files);
-  
-  // upload a file
-  const fileId = await drive.uploadFile(
-    '/path/to/your/file.jpg',
-    'my-uploaded-image.jpg',
-    'image/jpeg'
-  );
-  
-  // delete a file
-  await drive.deleteFile(fileId);
+  const code = "AUTHORIZATION_CODE_FROM_REDIRECT";
+
+  try {
+    const tokens = await getTokens(code);
+    console.log("Authentication successful!");
+    return true;
+  } catch (error) {
+    console.error("Authentication failed:", error);
+    return false;
+  }
 }
 
-// If you already have tokens, you can set them directly
-drive.setCredentials({
-  access_token: 'YOUR_ACCESS_TOKEN',
-  refresh_token: 'YOUR_REFRESH_TOKEN',
-  // other token properties
+function useExistingTokens() {
+  setCredentials({
+    access_token: "YOUR_ACCESS_TOKEN",
+    refresh_token: "YOUR_REFRESH_TOKEN",
+    expiry_date: 1234567890000,
+  });
+}
+
+async function listAllFiles() {
+  try {
+    const files = await listFiles();
+    console.log("Files in your Drive:", files);
+    /* Example output:
+    [
+      { id: '1abc...', name: 'document.pdf', mimeType: 'application/pdf' },
+      { id: '2def...', name: 'image.jpg', mimeType: 'image/jpeg' }
+    ]
+    */
+  } catch (error) {
+    console.error("Error listing files:", error);
+  }
+}
+
+async function uploadFileExample() {
+  try {
+    const fileId = await uploadFile(
+      "/local/path/to/file.pdf",
+      "uploaded-document.pdf",
+      "application/pdf"
+    );
+
+    console.log("File uploaded successfully with ID:", fileId);
+    return fileId;
+  } catch (error) {
+    console.error("Error uploading file:", error);
+    return null;
+  }
+}
+
+async function deleteFileExample(fileId: string) {
+  try {
+    await deleteFile(fileId);
+    console.log("File deleted successfully");
+  } catch (error) {
+    console.error("Error deleting file:", error);
+  }
+}
+
+async function exampleWorkflow() {
+  if (await authenticate()) {
+    await listAllFiles();
+    const newFileId = await uploadFileExample();
+    if (newFileId) {
+      console.log(
+        `File available at: https://drive.google.com/file/d/${newFileId}/view`
+      );
+      await deleteFileExample(newFileId);
+    }
+  }
+}
+```
+
+### Environment Variables (Alternative Setup)
+
+You can also use environment variables for configuration:
+
+```typescript
+import { initDrive } from "use-drive";
+
+initDrive({
+  clientId: process.env.GOOGLE_CLIENT_ID!,
+  clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+  redirectUri: process.env.GOOGLE_REDIRECT_URI!,
 });
+```
+
+### Error Handling
+
+```typescript
+try {
+  const files = await listFiles();
+} catch (error) {
+  if (error.message.includes("Drive API not initialized")) {
+    console.error("API not initialized. Call initDrive first.");
+  } else if (error.message.includes("auth")) {
+    console.error("Authentication error. Please re-authenticate.");
+  } else {
+    console.error("Operation failed:", error);
+  }
+}
 ```
 
 ## API Reference
